@@ -8,6 +8,7 @@ import StudentDashboard from './components/StudentDashboard';
 import TakeQuiz from './components/TakeQuiz';
 import Navbar from './components/Navbar';
 import QuizForm from './components/QuizForm';
+import ManagerDashboard from './components/ManagerDashboard';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -31,7 +32,14 @@ function App() {
         <Routes>
           <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/" />} />
           <Route path="/register" element={!user ? <Register setUser={setUser} /> : <Navigate to="/" />} />
-          <Route path="/" element={user ? (user.role === 'admin' ? <AdminPanel /> : <StudentDashboard />) : <Navigate to="/login" />} />
+          <Route path="/" element={
+            user ? (
+                user.role === 'admin' ? <AdminPanel /> :
+                user.role === 'manager' ? <ManagerDashboard /> :
+                <StudentDashboard />
+              ) : <Navigate to="/login" />
+            } 
+          />
           <Route path="/quiz/:id" element={user?.role === 'student' ? <TakeQuiz /> : <Navigate to="/login" />} />
           <Route path="/create-quiz" element={user?.role === 'admin' ? <QuizForm /> : <Navigate to="/" />} />
           <Route path="/create-quiz/:id" element={user?.role === 'admin' ? <QuizForm /> : <Navigate to="/" />} />

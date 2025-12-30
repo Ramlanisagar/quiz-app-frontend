@@ -11,6 +11,8 @@ export default function TakeQuiz() {
   const [answers, setAnswers] = useState({}); // key: question index → answer
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(null);
+  const [attemptLimitReached, setAttemptLimitReached] = useState(false);
+  const [nextAvailableTime, setNextAvailableTime] = useState('');
 
   const PASSING_MARK = 60;
   const username = localStorage.getItem('username') || 'Student';
@@ -19,6 +21,36 @@ export default function TakeQuiz() {
   useEffect(() => {
     API.get(`/quizzes/${id}`).then(res => setQuiz(res.data));
   }, [id]);
+  
+  useEffect(() => {
+    const checkLimit = async () => {
+      try {
+        const res = await API.get('/attempts');
+        const userAttempts = res.data[id] || [];
+
+        const attemptsArray = Array.isArray(userAttempts) ? userAttempts : 
+          (typeof userAttempts === 'object' ? [userAttempts] : []);
+
+        const now = new Date();
+        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+        const recent = attemptsArray.filter(a => new Date(a.timestamp || a.date) > twentyFourHoursAgo);
+
+        if (recent.length >= 3) {
+          const oldest = new Date(Math.min(...recent.map(a => new Date(a.timestamp || a.date))));
+          const next = new Date(oldest.getTime() + 24 * 60 * 60 * 1000);
+          setAttemptLimitReached(true);
+          setNextAvailableTime(next.toLocaleString());
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    if (showResult) {
+      checkLimit();
+    }
+  }, [showResult, id]);
 
   const currentQuestion = quiz?.questions[currentQuestionIndex];
 
@@ -137,34 +169,115 @@ export default function TakeQuiz() {
 
   if (showResult) {
     const passed = parseFloat(score) >= PASSING_MARK;
+       return (
+        <div className="container mt-5">
+          <div className="text-center result-hero py-5">
+            <div className="trophy">🏆</div>
+            <h1 className="display-3">Quiz Complete!</h1>
+            {passed ? (
+              <h2 className="text-white">Excellent Work! You Passed!</h2>
+            ) : (
+              <h2 className="text-white">Keep Practicing!</h2>
+            )}
+          </div>
 
-    return (
-      <div className="container mt-0">
-        <div className="text-center result-hero py-5">
-          <div style={{ fontSize: '100px' }}>🏆</div>
-          <h1 className="display-4">Quiz Complete!</h1>
-          <h2 className="mt-3">{passed ? 'Congratulations! You Passed!' : 'Keep Practicing!'}</h2>
-        </div>
+          <div className="text-center">
+            <h3>
+              Your Score: <strong style={{ fontSize: '2.8rem', color: passed ? '#FF9900' : '#dc3545' }}>{score}%</strong>
+            </h3>
 
-        <div className="text-center">
-          <h3>Your Score: <strong style={{fontSize: '2.5rem', color: passed ? '#FF9900' : '#dc3545'}}>{score}%</strong></h3>
+            {/* Custom Messages */}
+            <div className="mt-4">
+              {passed ? (
+                <div className="alert alert-success py-4 px-5 d-inline-block">
+                  <h4>🎉 Congratulations!</h4>
+                  <p className="mb-0">You are eligible for credits after completing a minimum of 4 videos in this learning path.</p>
+                </div>
+              ) : (
+                <div className="alert alert-warning py-4 px-5 d-inline-block">
+                  <h4>💪 Don't Give Up!</h4>
+                  <p className="mb-0">We recommend revisiting the learning path videos before your next attempt.</p>
+                </div>
+              )}
+            </div>
 
-          {passed && (
-            <div className="my-5">
-              <button className="btn btn-warning btn-lg px-5 py-4 shadow" onClick={generateCertificate}>
-                <strong>📜 Download Certificate</strong>
+            {/* Certificate Button */}
+            {passed && (
+              <div className="my-5">
+                <button className="btn btn-warning btn-lg px-5 py-4 shadow" onClick={generateCertificate}>
+                  <strong>📜 Download Your Certificate</strong>
+                </button>
+              </div>
+            )}
+
+            {/* Re-attempt & Dashboard Buttons */}
+            <div className="mt-5">
+              <button 
+                className="btn btn-primary btn-lg me-4" 
+                onClick={reattemptQuiz}
+                disabled={attemptLimitReached}
+              >
+                🔄 Re-attempt Quiz
+              </button>
+              <button className="btn btn-secondary btn-lg" onClick={() => navigate('/')}>
+                Back to Dashboard
               </button>
             </div>
-          )}
 
-          <div className="mt-4">
-            <button className="btn btn-primary btn-lg me-4" onClick={reattemptQuiz}>Re-attempt</button>
-            <button className="btn btn-secondary btn-lg" onClick={() => navigate('/')}>Dashboard</button>
+            {/* Limit Reached Message */}
+            {attemptLimitReached && (
+              <div className="alert alert-danger mt-4 py-4 px-5 d-inline-block">
+                <h4>⏳ Attempt Limit Reached</h4>
+                <p className="mb-0">
+                  You've used all 3 attempts in the last 24 hours.<br />
+                  <strong>Next attempt available after: {nextAvailableTime}</strong>
+                </p>
+              </div>
+            )}
           </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
+  //   return (
+  //     <div className="container mt-0">
+  //       <div className="text-center result-hero py-5">
+  //         <div style={{ fontSize: '100px' }}>🏆</div>
+  //         <h1 className="display-4">Quiz Complete!</h1>
+  //         <h2 className="mt-3">{passed ? 'Congratulations! You Passed!' : 'Keep Practicing!'}</h2>
+  //       </div>
+
+  //       <div className="text-center">
+  //         <h3>Your Score: <strong style={{fontSize: '2.5rem', color: passed ? '#FF9900' : '#dc3545'}}>{score}%</strong></h3>
+
+  //         {passed && (
+  //           <div className="my-5">
+  //             <button className="btn btn-warning btn-lg px-5 py-4 shadow" onClick={generateCertificate}>
+  //               <strong>📜 Download Certificate</strong>
+  //             </button>
+  //           </div>
+  //         )}
+
+  //         <div className="mt-4">
+  //           {/* <button className="btn btn-primary btn-lg me-4" onClick={reattemptQuiz}>Re-attempt</button> */}
+  //           <button 
+  //             className="btn btn-primary btn-lg me-4" 
+  //             onClick={reattemptQuiz}
+  //             disabled={attemptLimitReached}
+  //           >
+  //             🔄 Re-attempt Quiz
+  //           </button>
+  //           {attemptLimitReached && (
+  //             <div className="alert alert-warning mt-3">
+  //               <strong>Attempt limit reached!</strong><br />
+  //               Next attempt available after: <strong>{nextAvailableTime}</strong>
+  //             </div>
+  //           )}
+  //           <button className="btn btn-secondary btn-lg" onClick={() => navigate('/')}>Dashboard</button>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="container my-4">
